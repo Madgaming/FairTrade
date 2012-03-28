@@ -1,0 +1,8 @@
+author: Zetaeta
+database: false
+description: Allows users to trade items for money easily and fairly to stop scamming.
+generator: http://dinnerbone.com/minecraft/tools/pluginator/
+main: net.zetaeta.plugins.fairtrade.FairTrade
+name: FairTrade
+startup: postworld
+version: '1.0'
