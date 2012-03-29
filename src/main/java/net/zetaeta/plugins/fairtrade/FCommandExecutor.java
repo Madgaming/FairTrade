@@ -1,20 +1,16 @@
 package net.zetaeta.plugins.fairtrade;
 
 import static org.bukkit.Bukkit.getPlayer;
-
-import java.util.Iterator;
-import java.util.Map;
-import java.util.Set;
-
+import net.minecraft.server.EntityPlayer;
+import net.minecraft.server.IInventory;
 import net.zetaeta.plugins.libraries.ZPUtil;
 import net.zetaeta.plugins.libraries.commands.CommandHandler;
 import net.zetaeta.plugins.libraries.commands.Executor;
 
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
-import org.bukkit.enchantments.Enchantment;
+import org.bukkit.craftbukkit.entity.CraftPlayer;
 import org.bukkit.entity.Player;
-import org.bukkit.inventory.ItemStack;
 
 public class FCommandExecutor implements Executor {
 	
@@ -27,13 +23,15 @@ public class FCommandExecutor implements Executor {
 			return beginTrade(sender, ZPUtil.removeFirstIndex(args));
 		case "add" :
 		case "additem" :
-			return addItem(sender, ZPUtil.removeFirstIndex(args));
+			return addItem(sender);
+		case "accept" :
+			return acceptTrade(sender);
 		default :
 			return false;
 		}
 	}
 	
-
+	
 	private static boolean beginTrade(CommandSender sender, String[] args) {
 		if (args.length > 1) {
 			sender.sendMessage("§cUsage: /trade begin <player>");
@@ -69,12 +67,57 @@ public class FCommandExecutor implements Executor {
 	}
 	
 	
-	private boolean addItem(CommandSender sender, String[] args) {
+	private boolean acceptTrade(CommandSender sender) {
+		//  TODO: Replace this method with actual acceptTrade()
+		if (!(sender instanceof Player)) {
+			sender.sendMessage("§This command can only be run by a player!");
+			return true;
+		}
+		
+		Player player = (Player) sender;
+		
+		if (!(Trade.playersInTrades.contains(player))) {
+			sender.sendMessage("§cYou do not have a ")
+		}
+		
+	}
+	
+	
+	private static boolean addItem(CommandSender sender) {
 		if (!(sender instanceof Player)) {
 			sender.sendMessage("§cThis command can only be run by a player!");
 			return true;
 		}
-		int count = -1;
+		
+		if (!ZPUtil.checkPermission(sender, "fairtrade.additem")) {
+			return true;
+		}
+		
+		Player player = (Player) sender;
+		if (!(Trade.playersInTrades.contains(player))) {
+			sender.sendMessage("§cYou are not in a trade!");
+			return true;
+		}
+		
+		Trade trade = Trade.getTrade(player);
+		
+		if (trade == null) {
+			sender.sendMessage("§cAn error has occurred! D:");
+			return true;
+		}
+		
+		if (trade.getChest(player) == null) {
+			sender.sendMessage("§cAn error has occurred! D:");
+			return true;
+		}
+		
+		IInventory inv = trade.getChest(player);
+		
+		EntityPlayer ePlayer = ((CraftPlayer) player).getHandle();
+		ePlayer.openContainer(inv);
+		return true;
+		
+/*		int count = -1;
 		if (args.length == 1) {
 			try {
 				count = Integer.parseInt(args[0]);
@@ -121,6 +164,6 @@ public class FCommandExecutor implements Executor {
 			Trade thisTrade = Trade.getTrade((Player) sender);
 			Trade.getOtherPlayer(adder).sendMessage(otherMessage.toString());
 			adder.getInventory()
-		}
+		}*/
 	}
 }

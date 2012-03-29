@@ -10,6 +10,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryOpenEvent;
+import org.bukkit.event.inventory.InventoryType.SlotType;
 import org.bukkit.inventory.Inventory;
 
 public class FTInventoryListener implements Listener {
@@ -32,8 +33,12 @@ public class FTInventoryListener implements Listener {
 	}
 	
 	public void inventoryChanged(InventoryClickEvent event) {
-		if (!Trade.playersInTrades.contains((Player) event.getWhoClicked())) {
+		if (!(Trade.playersWithChestOpen.contains(event.getWhoClicked()))) {
 			return;
+		}
+		if (event.getSlotType() != SlotType.CONTAINER) {
+			return;
+		
 		}
 		
 		CraftInventory cInv = (CraftInventory) event.getInventory();
@@ -42,7 +47,7 @@ public class FTInventoryListener implements Listener {
 		}
 		CraftInventoryDoubleChest cdInv = (CraftInventoryDoubleChest) cInv;
 		
-		if (event.)
+		
 	}
 	
 }

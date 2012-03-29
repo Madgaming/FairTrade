@@ -1,7 +1,9 @@
 package net.zetaeta.plugins.fairtrade;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 import net.minecraft.server.InventoryLargeChest;
 import net.minecraft.server.TileEntityChest;
@@ -12,11 +14,17 @@ import org.bukkit.entity.Player;
 public class Trade {
 	public static InterMap<Player, Player> playersInTrades = new InterMap<Player, Player>();
 	public static Map<Player, Trade> trades = new HashMap<Player, Trade>();
+	public static Set<Player> playersWithChestOpen = new HashSet<Player>();
 	
 	private Player player1;
 	private Player player2;
-	private TileEntityChest chest1;
-	private TileEntityChest chest2;
+//	private TileEntityChest chest1a;
+//	private TileEntityChest chest2a;
+//	private TileEntityChest chest1b;
+//	private TileEntityChest chest2b;
+	private InventoryLargeChest chest1;
+	private InventoryLargeChest chest2;
+	
 	
 	public static Trade getTrade(Player player) {
 		if (trades.containsKey(player)) {
@@ -39,19 +47,13 @@ public class Trade {
 		if (trade == null) {
 			return null;
 		}
-		TileEntityChest c1;
-		TileEntityChest c2;
 		if (player.equals(player1)) {
-			c1 = chest2;
-			c2 = chest1;
+			return chest1;
 		}
 		else if (player.equals(player2)) {
-			c1 = chest1;
-			c2 = chest2;
-		}
-		else {
+			return chest2;
+		} else {
 			return null;
 		}
-		return new InventoryLargeChest("Trade with " + Trade.getOtherPlayer(player).getDisplayName(), c1, c2);
 	}
 }
