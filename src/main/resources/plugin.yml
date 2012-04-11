@@ -6,3 +6,46 @@ main: net.zetaeta.plugins.fairtrade.FairTrade
 name: FairTrade
 startup: postworld
 version: '1.0'
+commands:
+    trade:
+        usage: |
+            /trade begin <player> - begin trade with player.
+            /trade view - view your trade offers and add/remove items
+            /trade addmoney <amount> - add money to your offerings
+            /trade viewother - check other player's offerings
+            /trade money - check your and the other player's money offerings.
+            /trade finish - finish the trade, giving you a chance to check offerings before confirming.
+            /trade continue - continue trading after finishing
+            /trade cancel - cancel the trade at any point.
+            /trade confirm - confirm the trade after finishing it.
+permissions:
+    fairtrade.begin:
+        default: false
+    fairtrade.view:
+        default: false
+    fairtrade.addmoney:
+        default: false
+    fairtrade.viewother:
+        default: false
+    fairtrade.money:
+        default: false
+    fairtrade.finish:
+        default: false
+    fairtrade.continue:
+        default: false
+    fairtrade.cancel:
+        default: false
+    fairtrade.confirm:
+        default: false
+    fairtrade.use:
+        default: op
+        children:
+            fairtrade.begin: true
+            fairtrade.view: true
+            fairtrade.addmoney: true
+            fairtrade.viewother: true
+            fairtrade.money: true
+            fairtrade.finish: true
+            fairtrade.continue: true
+            fairtrade.cancel: true
+            fairtrade.confirm: true

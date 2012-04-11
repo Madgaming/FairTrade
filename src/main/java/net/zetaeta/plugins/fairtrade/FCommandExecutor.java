@@ -1,297 +1,547 @@
 package net.zetaeta.plugins.fairtrade;
 
+import static net.zetaeta.plugins.fairtrade.Trade.ActionStatus.INVITEE_HAS_CONFIRMED;
+import static net.zetaeta.plugins.fairtrade.Trade.ActionStatus.INVITEE_HAS_RESTARTED;
+import static net.zetaeta.plugins.fairtrade.Trade.ActionStatus.INVITEE_VIEWING_INVITOR;
+import static net.zetaeta.plugins.fairtrade.Trade.ActionStatus.INVITEE_VIEWING_OWN;
+import static net.zetaeta.plugins.fairtrade.Trade.ActionStatus.INVITOR_HAS_CONFIRMED;
+import static net.zetaeta.plugins.fairtrade.Trade.ActionStatus.INVITOR_HAS_RESTARTED;
+import static net.zetaeta.plugins.fairtrade.Trade.ActionStatus.INVITOR_VIEWING_INVITEE;
+import static net.zetaeta.plugins.fairtrade.Trade.ActionStatus.INVITOR_VIEWING_OWN;
 import static org.bukkit.Bukkit.getPlayer;
-import static net.zetaeta.plugins.fairtrade.FairTrade.plugin;
+
+import java.util.HashSet;
+
 import net.minecraft.server.EntityPlayer;
 import net.minecraft.server.IInventory;
-import net.zetaeta.plugins.fairtrade.Trade.Status;
+import net.zetaeta.plugins.fairtrade.Trade.Stage;
 import net.zetaeta.plugins.libraries.ZPUtil;
-import net.zetaeta.plugins.libraries.commands.CommandHandler;
-import net.zetaeta.plugins.libraries.commands.Executor;
 
+import org.bukkit.block.Block;
+import org.bukkit.block.Chest;
 import org.bukkit.command.Command;
+import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.craftbukkit.entity.CraftPlayer;
 import org.bukkit.entity.Player;
 
-public class FCommandExecutor implements Executor {
-	
-	@CommandHandler("trade")
-	public boolean onCommand(CommandSender sender, Command cmd, String cmdLabel, String[] args) {
-		switch (args[0]) {
-		case "start" :
-		case "init" :
-		case "begin" :
-			return beginTradeCmd(sender, ZPUtil.removeFirstIndex(args));
-		case "add" :
-		case "additem" :
-			return addItem(sender);
-		case "addmoney" :
-			return addMoneyCmd(sender, ZPUtil.removeFirstIndex(args));
-		case "view" :
-		case "viewother" :
-			return viewOtherCmd(sender, ZPUtil.removeFirstIndex(args));
-//		case "accept" :
-//			return acceptTrade(sender);
-		default :
-			return false;
-		}
-	}
-	
-	
-	private boolean addMoneyCmd(CommandSender sender, String[] args) {
-		if (!ZPUtil.checkPermission(sender, "addmoney")) {
-			return true;
-		}
-		if (!(sender instanceof Player)) {
-			sender.sendMessage("§cThis command can only be run by a player!");
-			return true;
-		}
-		if (args.length != 1) {
-			return false;
-		}
-		Player player = (Player) sender;
-		if (Trade.getTrade(player) == null) {
-			sender.sendMessage("§cYou are not trading!");
-			return true;
-		}
-		
-		
-		double amount;
-		
-		try {
-			amount = Double.parseDouble(args[0]);
-		}
-		catch(NumberFormatException e) {
-			sender.sendMessage("§cInvalid number format!");
-			sender.sendMessage("§cPlease user /trade addmoney <positive/negative number>");
-			return true;
-		}
-		
-		Trade trade = Trade.getTrade(player);
-		
-		boolean moneyAdded;
-		try {
-			moneyAdded = trade.addMoney(player, amount);
-		} catch (InvalidPlayerException e) {
-			player.sendMessage("Sorry, an error occurred! D:");
-			e.printStackTrace();
-			return true;
-		}
-		
-		player.sendMessage("§aYou added " + amount + " to your offering in the trade!");
-		trade.getInvitee().sendMessage("§a" + player.getDisplayName() + " added " + amount + " to his offerings in the trade!");
-		return false;
-	}
+@SuppressWarnings("boxing")
+public class FCommandExecutor implements CommandExecutor {
+    
+    private static final HashSet<Byte> transparentBlocks;
+    
+    static {
+        transparentBlocks = new HashSet<Byte>();
+        transparentBlocks.add((byte) 0);
+        transparentBlocks.add((byte) 8);
+        transparentBlocks.add((byte) 9);
+        transparentBlocks.add((byte) 10);
+    }
+    
+    public boolean onCommand(CommandSender sender, Command cmd, String lbl, String[] args) {
+        System.out.println(ZPUtil.arrayAsString(args));
+        if (args.length < 1)
+            return false;
+        switch (args[0]) {
+        case "start" :
+        case "init" :
+        case "begin" :
+            System.out.println("Pre: " + args[0]);
+            System.out.println("Clipped: " + ZPUtil.arrayAsString(ZPUtil.removeFirstIndex(args)));
+            return beginTradeCmd(sender, ZPUtil.removeFirstIndex(args));
+        case "add" :
+        case "view" :
+        case "check" :
+        case "additem" :
+            return addItem(sender);
+        case "addmoney" :
+            return addMoneyCmd(sender, ZPUtil.removeFirstIndex(args));
+        case "viewother" :
+        case "checkother" :
+            return viewOtherCmd(sender, ZPUtil.removeFirstIndex(args));
+        case "money" :
+            return moneyCmd(sender, ZPUtil.removeFirstIndex(args));
+        case "finish" :
+        case "end" :
+            return finishCmd(sender, ZPUtil.removeFirstIndex(args));
+        case "confirm" :
+        case "accept" :
+            return confirmTrade(sender, ZPUtil.removeFirstIndex(args));
+        case "cancel" :
+            return cancelTradeCmd(sender, ZPUtil.removeFirstIndex(args));
+        case "continue" :
+        case "restart" :
+            return restartTradeCmd(sender, ZPUtil.removeFirstIndex(args));
+        case "addchest" :
+            return addChestCmd(sender, ZPUtil.removeFirstIndex(args));
+        default :
+            return false;
+        }
+    }
+    
+    private static boolean addChestCmd(CommandSender sender, String[] args) {
+        try {
+            if (!checkValid(sender, "fairtrade.addchest", args, 0)) {
+                return true;
+            }
+        } catch (InvalidArgumentCountException e) {
+            
+            return false;
+        }
+        Player player = (Player) sender;
+        
+        Block block = player.getTargetBlock(transparentBlocks, 20);
+        if (block == null) {
+            sender.sendMessage("§cYou have not a chest in range!");
+            return true;
+        }
+        if (!(block.getState() instanceof Chest)) {
+            sender.sendMessage("§cYou have not a chest in range!");
+            return true;
+        }
+        FairTrade.addChest(player, (Chest) block.getState());
+        sender.sendMessage("§aTrade overflow chest set!");
+        return true;
+    }
+
+    private static class InvalidArgumentCountException extends Exception {
+        private static final long serialVersionUID = 1877056235566428252L;
+    }
+    
+    public static boolean checkValid(CommandSender sender, String permission, String[] args, int numArgs) throws InvalidArgumentCountException {
+        if (!(sender instanceof Player)) {
+            sender.sendMessage("§cThis command can only be run by a player!");
+            return false;
+        }
+        if (!ZPUtil.checkPermission(sender, permission)) {
+            return false;
+        }
+        if (args.length != numArgs) {
+            throw new InvalidArgumentCountException();
+        }
+        return true;
+    }
 
 
-	public static boolean beginTradeCmd(CommandSender sender, String[] args) {
-		if (!ZPUtil.checkPermission(sender, "fairtrade.begin")) {
-			return true;
-		}
-		if (args.length > 1) {
-			sender.sendMessage("§cUsage: /trade begin <player>");
-			return true;
-		}
-		if (!(sender instanceof Player)) {
-			sender.sendMessage("§cThis command can only be run by a player!");
-		}
-		if (getPlayer(args[0]) == null) {
-			sender.sendMessage("§cNot an online player!");
-		}
-		
-		
-		Player invitor = (Player) sender;
-		Player invitee = getPlayer(args[0]);
-		Trade trade;
-		boolean newTrade = false;
-		if (Trade.getTrade(invitor) == null) {
-			trade = new Trade(invitor, invitee);
-		}
-		else {
-			trade = Trade.getTrade(invitor);
-			newTrade = true;
-		}
-		
-		// If the player already has a pending invite
-		if (trade.getStatus() == Status.PENDING) {
-			if (trade.getInvitee().equals(invitee)) {
-				trade.setStatus(Status.IN_PROCESS);
-			}
-/*			if (plugin.pendingTrades.getByValue(invitor).equals(invitee)) {
-				trade = new Trade(invitor, invitee);
-				return true;
-			}*/
-			 trade.delete();
-		}
-		
-		// If the player already has invited someone
-		if (!newTrade) {
-			if (trade.getInvitee().equals(invitee)) {
-				invitee.sendMessage("§a§o" + invitor.getDisplayName() + "§r§a still wants to trade with you!");
-				invitee.sendMessage("§2 - §l/trade begin §ar§a" + invitor.getName() + " to begin trade!");
-				invitee.sendMessage("§2 - §l/trade refuse §r§ato deny the trade");
-				invitor.sendMessage("§aTrade request resent to " + invitee.getDisplayName());
-			}
-			else {
-				plugin.pendingTrades.removeKey(invitor);
-				plugin.pendingTrades.putKey(invitor, invitee);
-			}
-		}
-		
-		if (FairTrade.plugin.pendingTrades.containsKey(invitee) || FairTrade.plugin.pendingTrades.containsValue(invitee)) {
-			if (!plugin.pendingTrades.getFull(invitee).equals(invitor)) {
-				sender.sendMessage(new String[] {
-					"§aThis player already has a pending trade!",
-					"§aAsk them to complete that trade or cancel in order to continue with this trade."
-				});
-				invitee.sendMessage(new String[] {
-						"§a§o" + invitor.getDisplayName() + "§r§ahas invited you to trade!",
-						"§aIf you wish to participate, finish or cancel your current trade!"
-				});
-				return true;
-			}
-		}
-		
-		invitee.sendMessage(new String[] {
-				"§aYou have been invited to a trade by §2§o" + sender.getName() + "§r§a.",
-				"§aUse /trade accept to begin the trade"
-		});
-		FairTrade.plugin.pendingTrades.put((Player) sender, invitee);
-		return true;
-	}
+    private static boolean moneyCmd(CommandSender sender, String[] args) {
+        try {
+            if (!checkValid(sender, "fairtrade.money", args, 0))
+                return true;
+        } catch (InvalidArgumentCountException e1) {
+            return false;
+        }
+        Player player = (Player) sender;
+        Trade trade;
+        if ((trade = Trade.getTrade(player)) == null) {
+            sender.sendMessage("§aYou are not in a trade!");
+            return true;
+        }
+        Player otherPlayer;
+        try {
+            otherPlayer = trade.getOtherPlayer(player);
+        } catch (InvalidPlayerException e) {
+            e.printStackTrace();
+            return false;
+        }
+        sender.sendMessage(new String[] {"§aYou have put §2" + trade.getMoney(player) + " §ainto the trade!", "§a§o" + otherPlayer.getDisplayName() + " §ahas put §2" + trade.getMoney(otherPlayer) + " §ainto the trade!"});
+        return true;
+    }
 
 
-	public static boolean acceptTrade(CommandSender sender) {
-		//  TODO: Replace this method with actual acceptTrade()
-		if (!(sender instanceof Player)) {
-			sender.sendMessage("§cThis command can only be run by a player!");
-			return true;
-		}
-		
-		Player player = (Player) sender;
-		
-		if (!(Trade.playersInTrades.contains(player))) {
-			sender.sendMessage("§cYou do not have a ");
-		}
-		return false;
-	}
-	
-	
-	public static boolean viewOtherCmd(CommandSender sender, String[] args) {
-		if (!(sender instanceof CraftPlayer)) {
-			sender.sendMessage("§cThis command can only be run by a player!");
-			return true;
-		}
-		Player player = (Player) sender;
-		Trade trade = Trade.getTrade(player);
-		if (trade == null) {
-			sender.sendMessage("§aYou are not in a trade!");
-			return true;
-		}
-		if (trade.getInvitor().equals(player)) {
-			IInventory inv = trade.getChest(trade.getInvitee());
-			((CraftPlayer) player).getHandle().openContainer(inv);
-			trade.addStage(Trade.Status.CurrentStage.INVITOR_VIEWING_INVITEE);
-			return true;
-		}
-		else if (trade.getInvitee().equals(player)) {
-			IInventory inv = trade.getChest(trade.getInvitor());
-			((CraftPlayer) player).getHandle().openContainer(inv);
-			trade.addStage(Trade.Status.CurrentStage.INVITEE_VIEWING_INVITOR);
-			return true;
-		}
-		sender.sendMessage("§cAn error occurred!");
-		try {
-			throw new InvalidPlayerException("Expected " + CraftPlayer.class.getName() + " for player " + player.getName() + ", got " + player.getClass().getName() + "!");
-		} catch (InvalidPlayerException e) {
-			e.printStackTrace();
-			return true;
-		}
-	}
-	
-	
-	public static boolean addItem(CommandSender sender) {
-		if (!(sender instanceof Player)) {
-			sender.sendMessage("§cThis command can only be run by a player!");
-			return true;
-		}
-		
-		if (!ZPUtil.checkPermission(sender, "fairtrade.additem")) {
-			return true;
-		}
-		
-		Player player = (Player) sender;
-		if (!(Trade.playersInTrades.contains(player))) {
-			sender.sendMessage("§cYou are not in a trade!");
-			return true;
-		}
-		
-		Trade trade = Trade.getTrade(player);
-		
-		if (trade == null) {
-			sender.sendMessage("§cAn error has occurred! D:");
-			return true;
-		}
-		
-		if (trade.getChest(player) == null) {
-			sender.sendMessage("§cAn error has occurred! D:");
-			return true;
-		}
-		
-		IInventory inv = trade.getChest(player);
-		
-		EntityPlayer ePlayer = ((CraftPlayer) player).getHandle();
-		ePlayer.openContainer(inv);
-		return true;
-		
-/*		int count = -1;
-		if (args.length == 1) {
-			try {
-				count = Integer.parseInt(args[0]);
-			} catch(NumberFormatException e) {
-				
-			}
-		} else if (args.length > 1) {
-			return false;
-		} else {
-			count = -1;
-		}
-		Player adder = (Player) sender;
-		ItemStack adderItems = adder.getItemInHand().clone();
-		if (count == -1) {
-			count = adderItems.getAmount();
-		}
-		else if (adderItems.getAmount() < count) {
-			sender.sendMessage("§cYou do not have enough items in your hand!");
-			return true;
-		}
-		else if (adderItems.getAmount() > count) {
-			adderItems.setAmount(count);
-		}
-		
-		if (adderItems.getEnchantments().size() == 0) {
-			Map<Enchantment, Integer> enchantmentMap = adderItems.getEnchantments();
-			StringBuilder enchantsAsString = new StringBuilder(enchantmentMap.size() * 10);
-			Set<Enchantment> enchantments = enchantmentMap.keySet();
-			Enchantment[] enchantsArray = new Enchantment[enchantments.size()];
-			enchantments.toArray(enchantsArray);
-			int l = enchantsArray.length - 1;
-			
-			for (int i=0; i<l; i++) {
-				enchantsAsString.append(enchantsArray[i].getName()).append(", ");
-			}
-			
-			enchantsAsString.append(enchantsArray[l]).append(". ");
-			StringBuilder adderMessage = new StringBuilder(enchantsAsString.length() + 40 + 4 + 21);
-			adderMessage.append("§aYou are adding ").append(count).append(" of ").append(adderItems.getType().toString()).append(" with enchantments ").append(enchantsAsString);
-			sender.sendMessage(adderMessage.toString());
-			
-			StringBuilder otherMessage = new StringBuilder(enchantsAsString.length() + 36 + 4 + 21 + 16);
-			otherMessage.append("§a").append(sender.getName()).append(" is adding ").append(count).append(" of ").append(adderItems.getType().toString()).append(" with enchantments ").append(enchantsAsString);
-			Trade thisTrade = Trade.getTrade((Player) sender);
-			Trade.getOtherPlayer(adder).sendMessage(otherMessage.toString());
-			adder.getInventory()
-		}*/
-	}
+    private static boolean addMoneyCmd(CommandSender sender, String[] args) {
+        try {
+            if (!checkValid(sender, "fairtrade.addmoney", args, 1))
+                return true;
+        } catch (InvalidArgumentCountException e1) {
+            return false;
+        }
+        Player player = (Player) sender;
+        Trade trade;
+        if ((trade = Trade.getTrade(player)) == null) {
+            sender.sendMessage("§cYou are not trading!");
+            return true;
+        }
+        
+        if (trade.getStage() != Stage.IN_PROCESS) {
+            sender.sendMessage("§cYou are not allowed to add money at this point!");
+            return true;
+        }
+        
+        double amount;
+        
+        try {
+            amount = Double.parseDouble(args[0]);
+        }
+        catch(NumberFormatException e) {
+            sender.sendMessage("§cInvalid number format!");
+            sender.sendMessage("§cPlease user /trade addmoney <positive/negative number>");
+            return true;
+        }
+        
+        boolean moneyAdded;
+        try {
+            moneyAdded = trade.addMoney(player, amount);
+        } catch (InvalidPlayerException e) {
+            player.sendMessage("§cSorry, an error occurred! D:");
+            e.printStackTrace();
+            return true;
+        }
+        if (moneyAdded) {
+            player.sendMessage("§aYou added " + amount + " to your offering in the trade!");
+            try {
+                trade.getOtherPlayer(player).sendMessage("§a" + player.getDisplayName() + " added " + amount + " to his offerings in the trade!");
+            } catch (InvalidPlayerException e) {
+                sender.sendMessage("§cAn error occurred! D:");
+                e.printStackTrace();
+            }
+            return true;
+        } else {
+            player.sendMessage("§cYou do not have " + amount + " in your iConomy acoount!");
+            return true;
+        }
+    }
+
+
+    @SuppressWarnings("null")
+    public static boolean beginTradeCmd(CommandSender sender, String[] args) {
+        try {
+            if (!checkValid(sender, "fairtrade.begin", args, 1))
+                return true;
+        } catch (InvalidArgumentCountException e1) {
+            return false;
+        }
+        if (!(sender instanceof Player)) {
+            sender.sendMessage("§cThis command can only be run by a player!");
+        }
+        if (getPlayer(args[0]) == null) {
+            sender.sendMessage("§cNot an online player!");
+        }
+        
+        
+        Player invitor = (Player) sender;
+        Player invitee = getPlayer(args[0]);
+        if (invitor.equals(invitee)) {
+            invitor.sendMessage("§cYou cannot trade with yourself!");
+            return true;
+        }
+        Trade trade;
+        boolean newTrade = false;
+        if (Trade.getTrade(invitor) == null) {
+//            trade = new Trade(invitor, invitee);
+            trade = null;
+            newTrade = true;
+        }
+        else {
+            trade = Trade.getTrade(invitor);
+            newTrade = false;
+        }
+        
+        
+        // If the player already has invited someone
+        if (!newTrade) {
+            if (trade.getStage() == Stage.PENDING) { // if the trade is a pending trade.
+                if (trade.getInvitor().equals(invitor)) { // if the original invitor of the trade is the current invitor
+                    if (trade.getInvitee().equals(invitee)) { // if the player already invited this person
+                        invitee.sendMessage("§a§o" + invitor.getDisplayName() + "§r§a still wants to trade with you!");
+                        invitee.sendMessage("§a - §o/trade begin §a" + invitor.getName() + " to begin trade!");
+                        invitee.sendMessage("§a - §o/trade cancel §ato deny the trade");
+                        invitor.sendMessage("§aTrade request resent to " + invitee.getDisplayName());
+                        return true;
+                    }
+                    else { // if the person invited someone else
+                        trade.getInvitee().sendMessage("§aYour pending trade with " + invitor.getDisplayName() + " has been cancelled.");
+                        invitee.sendMessage(new String[] {    "§a" + invitor.getDisplayName() + " has invited you to trade!",
+                                                            "§a - §o/trade begin " + invitor.getDisplayName() + " §ato begin the trade",
+                                                            "§a - §o/trade cancel §ato deny the trade"});
+                        trade.delete();
+                        trade = new Trade(invitor, invitee);
+                        return true;
+                    }
+                }
+                else if (trade.getInvitee().equals(invitor)) { // if the original invitor invited this person
+                    if (trade.getInvitor().equals(invitee)) { // if the original invitor is the person being invited here
+                        invitor.sendMessage("§aBeginning trade with " + invitee.getDisplayName());
+                        invitee.sendMessage("§aBeginning trade with " + invitor.getDisplayName());
+                        trade.setStage(Stage.IN_PROCESS);
+                        return true;
+                    }
+                    else { // if someone else invited this invitor
+                        invitor.sendMessage(new String[] {    "§aYou are already in a trade with " + trade.getInvitor().getDisplayName() + "!", 
+                                                            "§aUse §o/trade cancel §ato exit!"
+                                                        });
+                        return true;
+                    }
+                }
+            }
+        }
+        
+        Trade otherTrade = Trade.getTrade(invitee);
+        if (otherTrade != null) { // if the invitee is already in a trade
+            if (!(otherTrade.getInvitor().equals(invitor) || otherTrade.getInvitee().equals(invitor))) {
+                sender.sendMessage(new String[] {
+                    "§aThis player already has a pending trade!",
+                    "§aAsk them to complete that trade or cancel in order to continue with this trade."
+                });
+                invitee.sendMessage(new String[] {
+                        "§a§o" + invitor.getDisplayName() + "§r§ahas invited you to trade!",
+                        "§aIf you wish to participate, finish or cancel your current trade!"
+                });
+                return true;
+            }
+        }
+        
+        invitee.sendMessage(new String[] {
+                "§aYou have been invited to a trade by §a§o" + sender.getName() + "§r§a.",
+                "§a - §o/trade begin " + invitor.getDisplayName() + " §ato begin the trade",
+                "§a - §o/trade cancel §ato deny the trade"
+        });
+        invitor.sendMessage("§aTrade request resent to " + invitee.getDisplayName());
+        trade = new Trade(invitor, invitee);
+        return true;
+    }
+    
+    public static boolean viewOtherCmd(CommandSender sender, String[] args) {
+        try {
+            if (!checkValid(sender, "fairtrade.viewother", args, 0))
+                return true;
+        } catch (InvalidArgumentCountException e1) {
+            return false;
+        }
+        Player player = (Player) sender;
+        Trade trade = Trade.getTrade(player);
+        if (trade == null) {
+            sender.sendMessage("§aYou are not in a trade!");
+            return true;
+        }
+        if (trade.getInvitor().equals(player)) {
+            IInventory inv = trade.getChest(trade.getInvitee());
+            ((CraftPlayer) player).getHandle().openContainer(inv);
+            trade.addActionStatus(INVITOR_VIEWING_INVITEE);
+            return true;
+        }
+        else if (trade.getInvitee().equals(player)) {
+            IInventory inv = trade.getChest(trade.getInvitor());
+            ((CraftPlayer) player).getHandle().openContainer(inv);
+            trade.addActionStatus(INVITEE_VIEWING_INVITOR);
+            return true;
+        }
+        sender.sendMessage("§cAn error occurred!");
+        try {
+            throw new InvalidPlayerException("Expected " + CraftPlayer.class.getName() + " for player " + player.getName() + ", got " + player.getClass().getName() + "!");
+        } catch (InvalidPlayerException e) {
+            e.printStackTrace();
+            return true;
+        }
+    }
+    
+    
+    private static boolean finishCmd(CommandSender sender, String[] args) {
+        try {
+            if (!checkValid(sender, "fairtrade.finish", args, 0))
+                return true;
+        } catch (InvalidArgumentCountException e1) {
+            return false;
+        }
+        Player player = (Player) sender;
+        Trade trade;
+        if ((trade = Trade.getTrade(player)) == null) {
+            sender.sendMessage("§cYou are not in a trade!");
+            return true;
+        }
+        trade.setStage(Stage.COMPLETE);
+        trade.getInvitor().sendMessage(new String[] {    "§aThe trade has been finished!", 
+                                                        "§aCheck the trade chests and money with §o/trade viewother §aand", 
+                                                        "§a§o/trade money§a to ensure you have what you want!", 
+                                                        "§aThen confirm the trade with §o/trade confirm§a and wait for the other player to do the same, and you will recieve your items."
+                                                        });
+        trade.getInvitee().sendMessage(new String[] {    "§aThe trade has been finished!", 
+                                                        "§aCheck the trade chests and money with §o/trade viewother §aand", 
+                                                        "§a§o/trade money§a to ensure you have what you want!", 
+                                                        "§aThen confirm the trade with §o/trade confirm§a and wait for the other player to do the same, and you will recieve your items."
+                                                        });
+        return true;
+    }
+
+
+    private static boolean cancelTradeCmd(CommandSender sender, String[] args) {
+        try {
+            if (!checkValid(sender, "fairtrade.cancel", args, 0))
+                return true;
+        } catch (InvalidArgumentCountException e1) {
+            return false;
+        }
+        if (args.length > 1) {
+            return false;
+        }
+        if (!ZPUtil.checkPermission(sender, "fairtrade.cancel")) {
+            return true;
+        }
+        Player player = (Player) sender;
+        Trade trade;
+        if ((trade = Trade.getTrade(player)) == null) {
+            sender.sendMessage("§cYou are not in a trade!");
+            return true;
+        }
+        sender.sendMessage("§aCancelling trade...");
+        try {
+            trade.getOtherPlayer(player).sendMessage("§a" + player.getDisplayName() + " has cancelled the trade!");
+        } catch (InvalidPlayerException e) {
+            e.printStackTrace();
+        }
+        trade.cancel();
+        trade.delete();
+        return true;
+    }
+    
+    
+    private static boolean restartTradeCmd(CommandSender sender, String[] args) {
+        try {
+            if (!checkValid(sender, "fairtrade.continue", args, 0))
+                return true;
+        } catch (InvalidArgumentCountException e1) {
+            return false;
+        }
+        Player player = (Player) sender;
+        
+        Trade trade;
+        if ((trade = Trade.getTrade(player)) == null) {
+            sender.sendMessage("§cYou are not in a trade!");
+            return true;
+        }
+        if (trade.getInvitor().equals(player)) {
+            if (trade.hasActionStatus(INVITEE_HAS_RESTARTED)) {
+                trade.setStage(Stage.IN_PROCESS);
+                trade.removeActionStatus(INVITEE_HAS_RESTARTED);
+                sender.sendMessage("§aGoing back to trading!");
+                trade.getInvitee().sendMessage("§aGoing back to trading!");
+                return true;
+            }
+            else if (trade.hasActionStatus(INVITOR_HAS_RESTARTED)) {
+                sender.sendMessage("§aYou have already requested to continue the trade!");
+                trade.getInvitee().sendMessage("§a" + player.getDisplayName() + " has re-requested that you continue trading!");
+                return true;
+            }
+            trade.addActionStatus(INVITOR_HAS_RESTARTED);
+            sender.sendMessage("§aYou have requested to continue trading!");
+            trade.getInvitee().sendMessage(new String[] {    "§a" + player.getDisplayName() + " has requested that you continue trading!", 
+                                                             "§aUse §o/trade continue §ato go back to trading!"});
+            return true;
+        }
+        if (trade.getInvitee().equals(player)) {
+            if (trade.hasActionStatus(INVITOR_HAS_RESTARTED)) {
+                trade.setStage(Stage.IN_PROCESS);
+                trade.removeActionStatus(INVITOR_HAS_RESTARTED);
+                sender.sendMessage("§aGoing back to trading!");
+                trade.getInvitor().sendMessage("§aGoing back to trading!");
+                return true;
+            }
+            else if (trade.hasActionStatus(INVITEE_HAS_RESTARTED)) {
+                sender.sendMessage("§aYou have already requested to continue the trade!");
+                trade.getInvitor().sendMessage("§a" + player.getDisplayName() + " has re-requested that you continue trading!");
+                return true;
+            }
+            trade.addActionStatus(INVITEE_HAS_RESTARTED);
+            sender.sendMessage("§aYou have requested to continue trading!");
+            trade.getInvitor().sendMessage(new String[] {    "§a" + player.getDisplayName() + " has requested that you continue trading!", 
+                                                             "§aUse §o/trade continue §ato go back to trading!"});
+            return true;
+        }
+        sender.sendMessage("§cSorry, an error occurred. Try again?");
+        return true;
+    }
+
+
+    private static boolean confirmTrade(CommandSender sender, String[] args) {
+        try {
+            if (!checkValid(sender, "fairtrade.confirm", args, 0))
+                return true;
+        } catch (InvalidArgumentCountException e1) {
+            return false;
+        }
+        Player player = (Player) sender;
+        Trade trade;
+        if ((trade = Trade.getTrade(player)) == null) {
+            sender.sendMessage("§cYou are not in a trade!");
+            return true;
+        }
+        if (trade.getStage() != Stage.COMPLETE) {
+            sender.sendMessage("§cThe trade is not ready to be confirmed!");
+            return true;
+        }
+        
+        if (trade.getInvitor().equals(player)) {
+            if (trade.hasActionStatus(INVITEE_HAS_CONFIRMED)) {
+                player.sendMessage("§aConfirming trade!");
+                trade.getInvitee().sendMessage("§aConfirming trade!");
+                trade.confirm();
+                return true;
+            }
+            if (trade.hasActionStatus(INVITOR_HAS_CONFIRMED)) {
+                sender.sendMessage("§aYou have already confirmed!");
+                trade.getInvitee().sendMessage("§a" + player.getDisplayName() + " has re-requested that you confirm the trade!");
+                return true;
+            }
+            sender.sendMessage("§aYou have confirmed the trade! Waiting for other player...");
+            trade.getInvitee().sendMessage(new String[] {    "§a" + player.getDisplayName() + " has confirmed the trade!", 
+                                                            "§aUse §o/trade confirm §ato confirm it!"});
+            trade.addActionStatus(INVITOR_HAS_CONFIRMED);
+            return true;
+        }
+        if (trade.getInvitee().equals(player)) {
+            if (trade.hasActionStatus(INVITOR_HAS_CONFIRMED)) {
+                player.sendMessage("§aConfirming trade!");
+                trade.getInvitor().sendMessage("§aConfirming trade!");
+                trade.confirm();
+                return true;
+            }
+            if (trade.hasActionStatus(INVITEE_HAS_CONFIRMED)) {
+                sender.sendMessage("§aYou have already confirmed!");
+                trade.getInvitee().sendMessage("§a" + player.getDisplayName() + " has re-requested that you confirm the trade!");
+                return true;
+            }
+            sender.sendMessage("§aYou have confirmed the trade! Waiting for other player...");
+            trade.getInvitor().sendMessage(new String[] {    "§a" + player.getDisplayName() + " has confirmed the trade!", 
+                                                            "§aUse §o/trade confirm §ato confirm it!"});
+            trade.addActionStatus(INVITEE_HAS_CONFIRMED);
+            return true;
+        }
+        return false;
+    }
+    
+    
+    
+    
+    
+    public static boolean addItem(CommandSender sender) {
+        String[] args = new String[0];
+        try {
+            if (!checkValid(sender, "fairtrade.view", args, 0))
+                return true;
+        } catch (InvalidArgumentCountException e1) {
+            return false;
+        }
+        Player player = (Player) sender;
+        Trade trade;
+        if ((trade = Trade.getTrade(player)) == null) {
+            sender.sendMessage("§cYou are not in a trade!");
+            return true;
+        }
+        
+        if (trade.getStage() == Stage.PENDING) {
+            sender.sendMessage("§cThe other player has not begun the trade!");
+            return true;
+        }
+        
+        if (trade.getChest(player) == null) {
+            sender.sendMessage("§cAn error has occurred! D:");
+            return true;
+        }
+        
+        IInventory inv = trade.getChest(player);
+        
+        EntityPlayer ePlayer = ((CraftPlayer) player).getHandle();
+        ePlayer.openContainer(inv);
+        trade.addActionStatus(trade.getInvitor().equals(player) ? INVITOR_VIEWING_OWN : INVITEE_VIEWING_OWN);
+        return true;
+    }
 }
