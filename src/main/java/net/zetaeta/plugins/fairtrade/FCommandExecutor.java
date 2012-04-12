@@ -1,13 +1,6 @@
 package net.zetaeta.plugins.fairtrade;
 
-import static net.zetaeta.plugins.fairtrade.Trade.ActionStatus.INVITEE_HAS_CONFIRMED;
-import static net.zetaeta.plugins.fairtrade.Trade.ActionStatus.INVITEE_HAS_RESTARTED;
-import static net.zetaeta.plugins.fairtrade.Trade.ActionStatus.INVITEE_VIEWING_INVITOR;
-import static net.zetaeta.plugins.fairtrade.Trade.ActionStatus.INVITEE_VIEWING_OWN;
-import static net.zetaeta.plugins.fairtrade.Trade.ActionStatus.INVITOR_HAS_CONFIRMED;
-import static net.zetaeta.plugins.fairtrade.Trade.ActionStatus.INVITOR_HAS_RESTARTED;
-import static net.zetaeta.plugins.fairtrade.Trade.ActionStatus.INVITOR_VIEWING_INVITEE;
-import static net.zetaeta.plugins.fairtrade.Trade.ActionStatus.INVITOR_VIEWING_OWN;
+import static net.zetaeta.plugins.fairtrade.Trade.ActionStatus.*;
 import static org.bukkit.Bukkit.getPlayer;
 
 import java.util.HashSet;
@@ -46,8 +39,6 @@ public class FCommandExecutor implements CommandExecutor {
         case "start" :
         case "init" :
         case "begin" :
-            System.out.println("Pre: " + args[0]);
-            System.out.println("Clipped: " + ZPUtil.arrayAsString(ZPUtil.removeFirstIndex(args)));
             return beginTradeCmd(sender, ZPUtil.removeFirstIndex(args));
         case "add" :
         case "view" :
@@ -73,6 +64,7 @@ public class FCommandExecutor implements CommandExecutor {
         case "restart" :
             return restartTradeCmd(sender, ZPUtil.removeFirstIndex(args));
         case "addchest" :
+        case "setchest" :
             return addChestCmd(sender, ZPUtil.removeFirstIndex(args));
         default :
             return false;
@@ -196,7 +188,7 @@ public class FCommandExecutor implements CommandExecutor {
             }
             return true;
         } else {
-            player.sendMessage("§cYou do not have " + amount + " in your iConomy acoount!");
+            player.sendMessage("§cYou do not have " + amount + " in your iConomy account!");
             return true;
         }
     }

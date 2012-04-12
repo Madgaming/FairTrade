@@ -39,11 +39,11 @@ public class Trade {
         public static final int INVITOR_VIEWING_INVITEE = 0b00000001;
         public static final int INVITEE_VIEWING_INVITOR = 0b00000010;
         public static final int INVITOR_VIEWING_OWN     = 0b00000100;
-        public static final int INVITEE_VIEWING_OWN        = 0b00001000;
-        public static final int INVITOR_HAS_CONFIRMED    = 0b00010000;
-        public static final int INVITEE_HAS_CONFIRMED    = 0b00100000;
-        public static final int INVITOR_HAS_RESTARTED    = 0b01000000;
-        public static final int INVITEE_HAS_RESTARTED    = 0b10000000;
+        public static final int INVITEE_VIEWING_OWN     = 0b00001000;
+        public static final int INVITOR_HAS_CONFIRMED   = 0b00010000;
+        public static final int INVITEE_HAS_CONFIRMED   = 0b00100000;
+        public static final int INVITOR_HAS_RESTARTED   = 0b01000000;
+        public static final int INVITEE_HAS_RESTARTED   = 0b10000000;
     }
     
     public Trade(Player invitor, Player invitee) {
@@ -105,6 +105,9 @@ public class Trade {
                     return false;
                 }
             }
+            if (amount > acct.getHoldings().getBalance()) {
+                return false;
+            }
             invitorMoney += amount;
             acct.getHoldings().add(-amount);
             return true;
@@ -115,6 +118,9 @@ public class Trade {
                 if (acct.getHoldings().getBalance() < -amount) {
                     return false;
                 }
+            }
+            if (amount > acct.getHoldings().getBalance()) {
+                return false;
             }
             inviteeMoney += amount;
             acct.getHoldings().add(-amount);
@@ -235,15 +241,19 @@ public class Trade {
             }
         }
         
+        invitorItems = null;
+        invitorCItems = null;
+        inviteeLeftoverItems = null;
+        inviteeLeftovers = null;
         
         ItemStack[] inviteeItems = inviteeChest.getContents();
-        CraftItemStack[] inviteeCItems = new CraftItemStack[invitorItems.length];
+        CraftItemStack[] inviteeCItems = new CraftItemStack[inviteeItems.length];
         l = inviteeItems.length;
         for (int i = 0; i < l; i++) {
             inviteeCItems[i] = new CraftItemStack(inviteeItems[i]);
         }
         
-        Map<Integer, org.bukkit.inventory.ItemStack> invitorLeftovers = invitor.getInventory().addItem(invitorCItems);
+        Map<Integer, org.bukkit.inventory.ItemStack> invitorLeftovers = invitor.getInventory().addItem(inviteeCItems);
         
         Collection<org.bukkit.inventory.ItemStack> invitorLeftoverItems = invitorLeftovers.values();
         

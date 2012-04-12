@@ -18,6 +18,7 @@ commands:
             /trade continue - continue trading after finishing
             /trade cancel - cancel the trade at any point.
             /trade confirm - confirm the trade after finishing it.
+            /trade setchest - Set your overflow chest.
 permissions:
     fairtrade.begin:
         default: false
@@ -37,6 +38,8 @@ permissions:
         default: false
     fairtrade.confirm:
         default: false
+    fairtrade.addchest:
+        default: false
     fairtrade.use:
         default: op
         children:
@@ -49,3 +52,4 @@ permissions:
             fairtrade.continue: true
             fairtrade.cancel: true
             fairtrade.confirm: true
+            fairtrade.addchest: true
