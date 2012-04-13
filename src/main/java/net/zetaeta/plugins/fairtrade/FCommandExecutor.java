@@ -32,7 +32,6 @@ public class FCommandExecutor implements CommandExecutor {
     }
     
     public boolean onCommand(CommandSender sender, Command cmd, String lbl, String[] args) {
-        System.out.println(ZPUtil.arrayAsString(args));
         if (args.length < 1)
             return false;
         switch (args[0]) {
@@ -116,6 +115,10 @@ public class FCommandExecutor implements CommandExecutor {
 
 
     private static boolean moneyCmd(CommandSender sender, String[] args) {
+        if (!FairTrade.useIConomy) {
+            sender.sendMessage("§ciConomy is not enabled!");
+            return true;
+        }
         try {
             if (!checkValid(sender, "fairtrade.money", args, 0))
                 return true;
@@ -141,6 +144,10 @@ public class FCommandExecutor implements CommandExecutor {
 
 
     private static boolean addMoneyCmd(CommandSender sender, String[] args) {
+        if (!FairTrade.useIConomy) {
+            sender.sendMessage("§ciConomy is not enabled!");
+            return true;
+        }
         try {
             if (!checkValid(sender, "fairtrade.addmoney", args, 1))
                 return true;
@@ -204,9 +211,11 @@ public class FCommandExecutor implements CommandExecutor {
         }
         if (!(sender instanceof Player)) {
             sender.sendMessage("§cThis command can only be run by a player!");
+            return true;
         }
         if (getPlayer(args[0]) == null) {
             sender.sendMessage("§cNot an online player!");
+            return true;
         }
         
         
@@ -216,6 +225,14 @@ public class FCommandExecutor implements CommandExecutor {
             invitor.sendMessage("§cYou cannot trade with yourself!");
             return true;
         }
+        
+        if (FairTrade.maxPlayerDistance > 0) {
+            if (invitor.getLocation().distance(invitee.getLocation()) > FairTrade.maxPlayerDistance) {
+                invitor.sendMessage("§cYou are too far away from that player!");
+                return true;
+            }
+        }
+        
         Trade trade;
         boolean newTrade = false;
         if (Trade.getTrade(invitor) == null) {
@@ -462,6 +479,12 @@ public class FCommandExecutor implements CommandExecutor {
         }
         
         if (trade.getInvitor().equals(player)) {
+            if (FairTrade.maxPlayerDistance > 0) {
+                if (trade.getInvitee().getLocation().distance(player.getLocation()) > FairTrade.maxPlayerDistance) {
+                    player.sendMessage("§cYou are too far away from that player!");
+                    return true;
+                }
+            }
             if (trade.hasActionStatus(INVITEE_HAS_CONFIRMED)) {
                 player.sendMessage("§aConfirming trade!");
                 trade.getInvitee().sendMessage("§aConfirming trade!");
@@ -480,6 +503,12 @@ public class FCommandExecutor implements CommandExecutor {
             return true;
         }
         if (trade.getInvitee().equals(player)) {
+            if (FairTrade.maxPlayerDistance > 0) {
+                if (trade.getInvitor().getLocation().distance(player.getLocation()) > FairTrade.maxPlayerDistance) {
+                    player.sendMessage("§cYou are too far away from that player!");
+                    return true;
+                }
+            }
             if (trade.hasActionStatus(INVITOR_HAS_CONFIRMED)) {
                 player.sendMessage("§aConfirming trade!");
                 trade.getInvitor().sendMessage("§aConfirming trade!");

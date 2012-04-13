@@ -98,6 +98,9 @@ public class Trade {
     
     @SuppressWarnings("boxing")
     public boolean addMoney(Player player, double amount) throws InvalidPlayerException {
+        if (!FairTrade.useIConomy) {
+            return false;
+        }
         if (player.equals(invitor)) {
             Account acct = new Account(player.getName());
             if (amount < 0) {
@@ -183,6 +186,9 @@ public class Trade {
     }
     
     public double getMoney(Player player) {
+        if (!FairTrade.useIConomy) {
+            return 0;
+        }
         if (player.equals(invitor)) {
             return invitorMoney;
         }
