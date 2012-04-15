@@ -36,14 +36,14 @@ public class Trade {
         PENDING, IN_PROCESS, COMPLETE
     }
     public static class ActionStatus {
-        public static final int INVITOR_VIEWING_INVITEE = 0b00000001;
-        public static final int INVITEE_VIEWING_INVITOR = 0b00000010;
-        public static final int INVITOR_VIEWING_OWN     = 0b00000100;
-        public static final int INVITEE_VIEWING_OWN     = 0b00001000;
-        public static final int INVITOR_HAS_CONFIRMED   = 0b00010000;
-        public static final int INVITEE_HAS_CONFIRMED   = 0b00100000;
-        public static final int INVITOR_HAS_RESTARTED   = 0b01000000;
-        public static final int INVITEE_HAS_RESTARTED   = 0b10000000;
+        public static final int INVITOR_VIEWING_INVITEE = 0x01;      // 0b00000001;
+        public static final int INVITEE_VIEWING_INVITOR = 0x02;      // 0b00000010;
+        public static final int INVITOR_VIEWING_OWN     = 0x04;      // 0b00000100;
+        public static final int INVITEE_VIEWING_OWN     = 0x08;      // 0b00001000;
+        public static final int INVITOR_HAS_CONFIRMED   = 0x10;      // 0b00010000;
+        public static final int INVITEE_HAS_CONFIRMED   = 0x20;      // 0b00100000;
+        public static final int INVITOR_HAS_RESTARTED   = 0x40;      // 0b01000000;
+        public static final int INVITEE_HAS_RESTARTED   = 0x80;      // 0b10000000;
     }
     
     public Trade(Player invitor, Player invitee) {
@@ -316,8 +316,10 @@ public class Trade {
         for (ItemStack itemStack : inviteeItems) {
             invitee.getInventory().addItem(new CraftItemStack(itemStack));
         }
-        (new Account(invitor.getName())).getHoldings().add(invitorMoney);
-        (new Account(invitee.getName())).getHoldings().add(inviteeMoney);
+        if (FairTrade.useIConomy) {
+            (new Account(invitor.getName())).getHoldings().add(invitorMoney);
+            (new Account(invitee.getName())).getHoldings().add(inviteeMoney);
+        }
         
         if (hasActionStatus(ActionStatus.INVITOR_VIEWING_INVITEE | ActionStatus.INVITOR_VIEWING_OWN)) {
             invitor.closeInventory();

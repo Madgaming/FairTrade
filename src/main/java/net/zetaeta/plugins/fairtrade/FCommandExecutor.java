@@ -7,8 +7,8 @@ import java.util.HashSet;
 
 import net.minecraft.server.EntityPlayer;
 import net.minecraft.server.IInventory;
+import net.zetaeta.libraries.ZPUtil;
 import net.zetaeta.plugins.fairtrade.Trade.Stage;
-import net.zetaeta.plugins.libraries.ZPUtil;
 
 import org.bukkit.block.Block;
 import org.bukkit.block.Chest;
@@ -34,40 +34,41 @@ public class FCommandExecutor implements CommandExecutor {
     public boolean onCommand(CommandSender sender, Command cmd, String lbl, String[] args) {
         if (args.length < 1)
             return false;
-        switch (args[0]) {
-        case "start" :
-        case "init" :
-        case "begin" :
+        String arg = args[0].toLowerCase();
+        if (arg.equals("start") || arg.equals("init") || arg.equals("begin")) {
             return beginTradeCmd(sender, ZPUtil.removeFirstIndex(args));
-        case "add" :
-        case "view" :
-        case "check" :
-        case "additem" :
-            return addItem(sender);
-        case "addmoney" :
-            return addMoneyCmd(sender, ZPUtil.removeFirstIndex(args));
-        case "viewother" :
-        case "checkother" :
-            return viewOtherCmd(sender, ZPUtil.removeFirstIndex(args));
-        case "money" :
-            return moneyCmd(sender, ZPUtil.removeFirstIndex(args));
-        case "finish" :
-        case "end" :
-            return finishCmd(sender, ZPUtil.removeFirstIndex(args));
-        case "confirm" :
-        case "accept" :
-            return confirmTrade(sender, ZPUtil.removeFirstIndex(args));
-        case "cancel" :
-            return cancelTradeCmd(sender, ZPUtil.removeFirstIndex(args));
-        case "continue" :
-        case "restart" :
-            return restartTradeCmd(sender, ZPUtil.removeFirstIndex(args));
-        case "addchest" :
-        case "setchest" :
-            return addChestCmd(sender, ZPUtil.removeFirstIndex(args));
-        default :
-            return false;
         }
+        if (arg.equals("add") || arg.equals("view") || arg.equals("check") || arg.equals("additem")) {
+            return addItem(sender);
+        }
+        if (arg.equals("addmoney")) {
+            return addMoneyCmd(sender, ZPUtil.removeFirstIndex(args));
+        }
+        if (arg.equals("viewother") || arg.equals("checkother")) {
+            return viewOtherCmd(sender, ZPUtil.removeFirstIndex(args));
+        }
+        if (arg.equals("money")) {
+            return moneyCmd(sender, ZPUtil.removeFirstIndex(args));
+        }
+        if (arg.equals("finish") || arg.equals("end")) {
+            return finishCmd(sender, ZPUtil.removeFirstIndex(args));
+        }
+        if (arg.equals("confirm") || arg.equals("accept")) {
+            return confirmTrade(sender, ZPUtil.removeFirstIndex(args));
+        }
+        if (arg.equals("cancel")) {
+            return cancelTradeCmd(sender, ZPUtil.removeFirstIndex(args));
+        }
+        if (arg.equals("continue") || arg.equals("restart")) {
+            return restartTradeCmd(sender, ZPUtil.removeFirstIndex(args));
+        }
+        if (arg.equals("addchest") || arg.equals("setchest")) {
+            return addChestCmd(sender, ZPUtil.removeFirstIndex(args));
+        }
+        if (arg.equals("chest") || arg.equals("chestinfo")) {
+            return chestInfoCmd(sender);
+        }
+        return false;
     }
     
     private static boolean addChestCmd(CommandSender sender, String[] args) {
@@ -565,4 +566,25 @@ public class FCommandExecutor implements CommandExecutor {
         trade.addActionStatus(trade.getInvitor().equals(player) ? INVITOR_VIEWING_OWN : INVITEE_VIEWING_OWN);
         return true;
     }
+
+    private boolean chestInfoCmd(CommandSender sender) {
+        try {
+            if (!checkValid(sender, "fairtrade.chestinfo", new String[0], 0)) {
+                return true;
+            }
+        } catch (InvalidArgumentCountException e) {
+            return false;
+        }
+        
+        Player player = (Player) sender;
+        if (FairTrade.playerHasOverflowChest(player)) {
+            Chest chest = FairTrade.getPlayerOverflowChestBlock(player);
+            player.sendMessage(new StringBuilder().append("§aYour overflow chest is at §2X: ").append(chest.getX()).append(", Y: ").append(chest.getY()).append(", Z: ").append(chest.getZ()).toString());
+        }
+        else {
+            player.sendMessage("§cYou do not have an overflow chest!");
+        }
+        return true;
+    }
+
 }

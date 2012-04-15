@@ -6,6 +6,8 @@ main: net.zetaeta.plugins.fairtrade.FairTrade
 name: FairTrade
 startup: postworld
 version: '1.0'
+softdepend: 
+    - iConomy
 commands:
     trade:
         usage: |
@@ -19,6 +21,7 @@ commands:
             /trade cancel - cancel the trade at any point.
             /trade confirm - confirm the trade after finishing it.
             /trade setchest - Set your overflow chest.
+            /trade chestinfo - see the location of your overflow chest if you have one.
 permissions:
     fairtrade.begin:
         default: false

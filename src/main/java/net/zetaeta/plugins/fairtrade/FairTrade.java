@@ -17,6 +17,9 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import com.iCo6.iConomy;
+import com.iCo6.system.Account;
+
 public class FairTrade extends JavaPlugin {
 
     public static FairTrade plugin;
@@ -29,7 +32,7 @@ public class FairTrade extends JavaPlugin {
     
     public static boolean useIConomy;
     public static double maxPlayerDistance;
-    private static Map<String, Chest> overflowChests = new HashMap<>();
+    private static Map<String, Chest> overflowChests = new HashMap<String, Chest>();
     
     
     public void onDisable() {
@@ -63,6 +66,20 @@ public class FairTrade extends JavaPlugin {
         else {
             config.set("iconomy_enabled", false);
             useIConomy = false;
+        }
+        
+        if (useIConomy) {
+            try {
+                iConomy iconomy = (iConomy) getServer().getPluginManager().getPlugin("iConomy");
+                log.info("Using iConomy version " + iconomy.getDescription().getVersion());
+            }
+            catch (Throwable t) {
+                log.warning("You have set FairTrade to use iConomy, but iConomy is not enabled!");
+                useIConomy = false;
+            }
+        }
+        else {
+            log.info("Not using iConomy.");
         }
         
         final String playerDistanceConfig = "max_player_distance";
@@ -150,14 +167,16 @@ public class FairTrade extends JavaPlugin {
         }
         return chest.getBlockInventory();
     }
+    
+    public static Chest getPlayerOverflowChestBlock(Player player) {
+        return overflowChests.get(player.getName());
+    }
 
     @SuppressWarnings("boxing")
     public static void addChest(Player player, Chest chest) {
-        player.sendMessage("addChest!");
         overflowChests.put(player.getName(), chest);
-        player.sendMessage("OverflowAdded!");
-        if (!plugin.config.contains("players.chests")) {
-            plugin.config.createSection("players.chests");
+        if (!plugin.players.contains("players.chests")) {
+            plugin.players.createSection("players.chests");
         }
         ConfigurationSection confSec = plugin.players.getConfigurationSection("players.chests");
         confSec.set(player.getName() + ".x", chest.getLocation().getBlockX());
